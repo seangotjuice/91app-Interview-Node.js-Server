@@ -1,0 +1,24 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+
+variables:
+  sessionId: null
+
+scenarios:
+  - flow:
+      - post:
+          url: "/api/upload/sessions"
+          json:
+            totalRecord: 100000
+        capture:
+          - json: "$.sessionId"
+            as: "sessionId"
+      - post:
+          url: "/api/upload/sessions/{{ sessionId }}/1"
+          json:
+            seqNum: 1
+            data: { "keyA": "foo", "keyB": 123 }
+      # Add more steps as needed
