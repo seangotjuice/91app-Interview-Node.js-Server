@@ -21,4 +21,3 @@ scenarios:
           json:
             seqNum: 1
             data: { "keyA": "foo", "keyB": 123 }
-      # Add more steps as needed

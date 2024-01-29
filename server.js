@@ -37,27 +37,40 @@ app.post('/api/upload/sessions', async (req, res) => {
 app.post('/api/upload/sessions/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   const { seqNum, data } = req.body;
-
+ 
   if (!uploadSessions[sessionId]) {
-    return res.status(404).json({ message: 'Upload session not found' });
+     return res.status(404).json({ message: 'Upload session not found' });
   }
-
+ 
   if (!uploadSessions[sessionId].expectedSeqNums.has(seqNum)) {
-    return res.status(400).json({ message: 'Unexpected sequence number' });
+     return res.status(400).json({ message: 'Unexpected sequence number' });
   }
-
-  // 若資料包確實收到，就從Set檢查表裡面刪掉這個號碼的資料包
+ 
   uploadSessions[sessionId].expectedSeqNums.delete(seqNum);
-
+ 
   const dataWithSeqNum = { seqNum, data, hash: calculateHash(data) };
   uploadSessions[sessionId].batches.push(dataWithSeqNum);
-
-  const filePath = path.join(__dirname, `upload-data/${sessionId}_batch${seqNum}`);
-  await fs.writeFile(filePath, JSON.stringify(data)); 
-
+ 
+  const dirPath = path.join(__dirname, `upload-data/`);
+  const filePath = path.join(dirPath, `${sessionId}_batch${seqNum}`);
+   
+  // 確保寫入檔案之前，已經開好upload-data資料夾
+  try {
+     await fs.mkdir(dirPath, { recursive: true });
+  } catch (err) {
+     console.error(`Failed to create directory: ${err}`);
+  }
+ // 寫入檔案
+  try {
+     await fs.writeFile(filePath, JSON.stringify(data)); 
+  } catch (err) {
+     console.error(`Failed to write file: ${err}`);
+  }
+ 
   res.sendStatus(204);
-});
-
+ });
+ 
+  
 // 3. POST /api/upload/sessions/:sessionId/finish
 app.post('/api/upload/sessions/:sessionId/finish', async (req, res) => {
   const { sessionId } = req.params;
@@ -67,9 +80,11 @@ app.post('/api/upload/sessions/:sessionId/finish', async (req, res) => {
   }
 
   async function checkRemainingSeqNums(seqNums) {
+    const dirPath = path.join(__dirname, `upload-data/`);
     // 若確定expectedSeqNum檢查表都清空了，意即所有資料包都已收到
     if (seqNums.size === 0) {
-      const finalFilePath = path.join(__dirname, `upload-data/${sessionId}_final`);
+      const finalFilePath = path.join(dirPath, `${sessionId}_final`);
+
       const mergedData = [];
       const { batches } = uploadSessions[sessionId]
 
@@ -87,9 +102,12 @@ app.post('/api/upload/sessions/:sessionId/finish', async (req, res) => {
 
         mergedData.push(...batchData);
       }
-
-      await fs.writeFile(finalFilePath, JSON.stringify(mergedData));
-
+      // 寫入檔案
+      try {
+        await fs.writeFile(finalFilePath, JSON.stringify(mergedData));
+      } catch (err) {
+        console.error(`Failed to write file: ${err}`);
+      }
       const validationResult =
         mergedData.length === uploadSessions[sessionId].totalRecord ? 'Success' : 'Failed';
 
